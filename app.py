@@ -119,12 +119,12 @@ with t1:
     st.subheader("BMS Forensics: SOH vs. Odometer")
     st.info("Visualizing premature health degradation in outlier vehicles.")
     # Z-Score helps identify vehicles needing service
-        st.scatter_chart(data=f_df, x='Odometer_Miles', y='Battery_SOH', color='Model', size='SOH_Z_Score')
+    st.scatter_chart(data=f_df, x='Odometer_Miles', y='Battery_SOH', color='Model', size='SOH_Z_Score')
 
 with t2:
     st.subheader("Billing Integrity (Benford's Law)")
     st.info("Forensic analysis of Supercharger billing session costs.")
-        ben_counts = f_df['Lead_Digit'].value_counts(normalize=True).sort_index().drop(0, errors='ignore')
+    ben_counts = f_df['Lead_Digit'].value_counts(normalize=True).sort_index().drop(0, errors='ignore')
     st.bar_chart(ben_counts)
 
 with t3:

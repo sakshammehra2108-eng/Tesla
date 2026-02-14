@@ -100,10 +100,10 @@ t1, t2 = st.tabs(["🔋 Battery Health", "🕵️ Billing Integrity"])
 
 with t1:
     st.subheader("BMS Forensics")
-        st.scatter_chart(data=f_df, x='Odometer_Miles', y='Battery_SOH', color='Model')
+    st.scatter_chart(data=f_df, x='Odometer_Miles', y='Battery_SOH', color='Model')
     # Corrected indentation for NameError fix
     st.info("**Conclusion:** High-mileage outliers show 12% faster wear. Recommend thermal pre-conditioning.")
 
 with t2:
     st.subheader("Billing Forensics")
-        ben_counts = f_df['Lead_Digit'].value_counts(normalize=True).sort_index
+    ben_counts = f_df['Lead_Digit'].value_counts(normalize=True).sort_index

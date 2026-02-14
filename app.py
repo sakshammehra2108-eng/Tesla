@@ -120,7 +120,7 @@ t1, t2, t3 = st.tabs(["🔋 Battery Health", "🕵️ Billing Forensics", "📊 
 
 with t1:
     st.subheader("BMS Forensics: Odometer vs. SOH")
-        st.scatter_chart(data=f_df, x='Odometer_Miles', y='Battery_SOH', color='Model')
+    st.scatter_chart(data=f_df, x='Odometer_Miles', y='Battery_SOH', color='Model')
     
     # Restored Conclusion
     st.info("""

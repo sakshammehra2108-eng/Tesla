@@ -13,6 +13,13 @@ except ImportError:
     PLOTLY_AVAILABLE = False
     st.warning("⚠️ Plotly not installed. Install it for better visualizations: `pip install plotly`")
 
+# Check if matplotlib is available for gradient styling
+try:
+    import matplotlib
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+
 # --- 1. GLOBAL MASTER CONFIGURATION ---
 tesla_master = {
     'Model S Plaid': {
@@ -646,18 +653,31 @@ with tab3:
     regional_stats.columns = ['Vehicles', 'Avg SOH %', 'Avg Wh/mi', 'Avg Odometer', 'Avg Charge Cost $']
     
     # Create a more visually appealing dataframe
-    st.dataframe(
-        regional_stats.style.background_gradient(cmap='RdYlGn', subset=['Avg SOH %'])
-                           .background_gradient(cmap='RdYlGn_r', subset=['Avg Wh/mi'])
-                           .format({
-                               'Vehicles': '{:,.0f}',
-                               'Avg SOH %': '{:.1f}%',
-                               'Avg Wh/mi': '{:.0f}',
-                               'Avg Odometer': '{:,.0f}',
-                               'Avg Charge Cost $': '${:.2f}'
-                           }),
-        use_container_width=True
-    )
+    if MATPLOTLIB_AVAILABLE:
+        st.dataframe(
+            regional_stats.style.background_gradient(cmap='RdYlGn', subset=['Avg SOH %'])
+                               .background_gradient(cmap='RdYlGn_r', subset=['Avg Wh/mi'])
+                               .format({
+                                   'Vehicles': '{:,.0f}',
+                                   'Avg SOH %': '{:.1f}%',
+                                   'Avg Wh/mi': '{:.0f}',
+                                   'Avg Odometer': '{:,.0f}',
+                                   'Avg Charge Cost $': '${:.2f}'
+                               }),
+            use_container_width=True
+        )
+    else:
+        # Fallback without gradient styling
+        st.dataframe(
+            regional_stats.style.format({
+                'Vehicles': '{:,.0f}',
+                'Avg SOH %': '{:.1f}%',
+                'Avg Wh/mi': '{:.0f}',
+                'Avg Odometer': '{:,.0f}',
+                'Avg Charge Cost $': '${:.2f}'
+            }),
+            use_container_width=True
+        )
     
     with st.expander("📖 How to Read This Table"):
         st.markdown("""
@@ -730,12 +750,20 @@ with tab4:
             })
     
     specs_df = pd.DataFrame(specs_data)
-    st.dataframe(
-        specs_df.style.background_gradient(cmap='Greens', subset=['Fleet Count'])
-                      .background_gradient(cmap='Blues', subset=['Range (mi)'])
-                      .format({'Fleet Count': '{:,}'}),
-        use_container_width=True
-    )
+    
+    if MATPLOTLIB_AVAILABLE:
+        st.dataframe(
+            specs_df.style.background_gradient(cmap='Greens', subset=['Fleet Count'])
+                          .background_gradient(cmap='Blues', subset=['Range (mi)'])
+                          .format({'Fleet Count': '{:,}'}),
+            use_container_width=True
+        )
+    else:
+        # Fallback without gradient styling
+        st.dataframe(
+            specs_df.style.format({'Fleet Count': '{:,}'}),
+            use_container_width=True
+        )
 
 with tab5:
     st.markdown("### 🔍 Advanced Diagnostic Tools")
@@ -874,19 +902,26 @@ with col3:
     st.caption("End-to-end encrypted • SOC 2 Type II Certified")
 
 # Install instructions reminder
-if not PLOTLY_AVAILABLE:
+if not PLOTLY_AVAILABLE or not MATPLOTLIB_AVAILABLE:
     st.info("""
     ### 📦 Enhance Your Dashboard
     
-    For better interactive visualizations, install Plotly:
+    For the best experience, install these packages:
     
     ```bash
-    pip install plotly
+    pip install plotly matplotlib
     ```
     
-    The app will work without it, but Plotly provides:
-    - Interactive hover tooltips
-    - Zoom and pan capabilities
-    - Better color schemes
-    - Professional chart styling
-    """)
+    **What you're missing:**
+    {}
+    {}
+    
+    **Benefits:**
+    - Interactive hover tooltips (Plotly)
+    - Zoom and pan capabilities (Plotly)
+    - Color-coded table backgrounds (Matplotlib)
+    - Professional chart styling (Plotly)
+    """.format(
+        "- ❌ Plotly (interactive charts)" if not PLOTLY_AVAILABLE else "- ✅ Plotly installed",
+        "- ❌ Matplotlib (gradient table styling)" if not MATPLOTLIB_AVAILABLE else "- ✅ Matplotlib installed"
+    ))

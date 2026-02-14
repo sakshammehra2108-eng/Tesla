@@ -3,8 +3,15 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from datetime import datetime, timedelta
-import plotly.express as px
-import plotly.graph_objects as go
+
+# Try to import plotly, if not available use streamlit native charts
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    st.warning("⚠️ Plotly not installed. Install it for better visualizations: `pip install plotly`")
 
 # --- 1. GLOBAL MASTER CONFIGURATION ---
 tesla_master = {
@@ -63,9 +70,21 @@ st.set_page_config(
 # --- 3. ENHANCED CUSTOM STYLING ---
 st.markdown("""
     <style>
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
     /* Main styling */
+    * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
     .main {
         background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+    }
+    
+    /* Smooth scrolling */
+    html {
+        scroll-behavior: smooth;
     }
     
     /* Tesla Red accent */
@@ -75,36 +94,36 @@ st.markdown("""
         border-radius: 12px;
         border-left: 4px solid #E82127;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .stMetric:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 12px rgba(232, 33, 39, 0.4);
     }
     
     .stMetric label {
         color: #a0a0a0 !important;
-        font-size: 14px !important;
+        font-size: 13px !important;
         font-weight: 500 !important;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 1.2px;
     }
     
     .stMetric [data-testid="stMetricValue"] {
         color: #ffffff !important;
-        font-size: 32px !important;
+        font-size: 30px !important;
         font-weight: 700 !important;
     }
     
-    /* Smooth scrolling */
-    html {
-        scroll-behavior: smooth;
-    }
-    
-    /* Cards and containers */
-    div[data-testid="stVerticalBlock"] > div {
-        background-color: transparent;
+    .stMetric [data-testid="stMetricDelta"] {
+        font-size: 14px !important;
     }
     
     /* Sidebar styling */
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0f0f0f 0%, #1a1a1a 100%);
-        border-right: 1px solid #E82127;
+        border-right: 2px solid #E82127;
     }
     
     section[data-testid="stSidebar"] .stMarkdown {
@@ -121,6 +140,7 @@ st.markdown("""
         font-weight: 600;
         transition: all 0.3s ease;
         box-shadow: 0 4px 6px rgba(232, 33, 39, 0.3);
+        width: 100%;
     }
     
     .stButton button:hover {
@@ -158,7 +178,7 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
     
-    /* Info boxes */
+    /* Info/Warning/Error boxes */
     .stAlert {
         border-radius: 10px;
         border-left: 4px solid #E82127;
@@ -174,18 +194,6 @@ st.markdown("""
         font-weight: 600;
     }
     
-    /* Popover */
-    div[data-testid="stPopover"] {
-        background-color: #1a1a1a;
-        border: 1px solid #E82127;
-        border-radius: 8px;
-    }
-    
-    /* Select boxes and inputs */
-    .stSelectbox, .stMultiSelect {
-        color: #ffffff;
-    }
-    
     /* Headers */
     h1, h2, h3 {
         color: #ffffff !important;
@@ -196,12 +204,27 @@ st.markdown("""
     hr {
         border-color: #E82127;
         opacity: 0.3;
+        margin: 2rem 0;
     }
     
-    /* Charts */
-    .js-plotly-plot {
-        border-radius: 12px;
-        overflow: hidden;
+    /* Multiselect */
+    .stMultiSelect [data-baseweb="tag"] {
+        background-color: #E82127;
+    }
+    
+    /* Download button */
+    .stDownloadButton button {
+        background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
+        color: white;
+        border: 1px solid #E82127;
+        border-radius: 8px;
+        padding: 12px 24px;
+        font-weight: 600;
+    }
+    
+    .stDownloadButton button:hover {
+        background: linear-gradient(135deg, #E82127 0%, #c01820 100%);
+        border-color: #E82127;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -350,7 +373,7 @@ with st.sidebar:
     st.metric("Total Miles", f"{(df['Odometer_Miles'].sum() / 1e6):.1f}M")
     
     st.markdown("---")
-    if st.button("🔄 Refresh Data", use_container_width=True):
+    if st.button("🔄 Refresh Data"):
         st.cache_data.clear()
         st.rerun()
 
@@ -434,26 +457,30 @@ with tab1:
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Interactive scatter plot
-        fig = px.scatter(
-            f_df,
-            x='Odometer_Miles',
-            y='Battery_SOH',
-            color='Model',
-            size='Supercharger_Ratio',
-            hover_data=['VIN', 'Region', 'Color', 'Ambient_Temp_Avg'],
-            title='Battery Health vs Odometer Reading',
-            template='plotly_dark',
-            color_discrete_sequence=px.colors.qualitative.Bold
-        )
-        fig.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            xaxis_title="Odometer (Miles)",
-            yaxis_title="State of Health (%)"
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("#### Battery Health vs Odometer Reading")
+        
+        # Use native streamlit scatter if plotly not available
+        if PLOTLY_AVAILABLE:
+            fig = px.scatter(
+                f_df,
+                x='Odometer_Miles',
+                y='Battery_SOH',
+                color='Model',
+                size='Supercharger_Ratio',
+                hover_data=['VIN', 'Region', 'Color', 'Ambient_Temp_Avg'],
+                template='plotly_dark',
+                color_discrete_sequence=px.colors.qualitative.Bold
+            )
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'),
+                xaxis_title="Odometer (Miles)",
+                yaxis_title="State of Health (%)"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.scatter_chart(data=f_df, x='Odometer_Miles', y='Battery_SOH', color='Model')
         
         with st.expander("📖 How to Read This Chart"):
             st.markdown("""
@@ -473,20 +500,7 @@ with tab1:
         st.markdown("#### 🎯 Battery Health Distribution")
         health_dist = f_df['Battery_Health_Status'].value_counts()
         
-        fig2 = go.Figure(data=[go.Pie(
-            labels=health_dist.index,
-            values=health_dist.values,
-            hole=0.4,
-            marker=dict(colors=['#E82127', '#ff6b6b', '#ffd93d', '#6bcf7f'])
-        )])
-        fig2.update_layout(
-            template='plotly_dark',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            showlegend=True
-        )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.bar_chart(health_dist)
         
         st.markdown("#### 📋 Health Categories")
         st.markdown(f"""
@@ -539,67 +553,42 @@ with tab2:
     col1, col2 = st.columns(2)
     
     with col1:
-        # Efficiency by model
-        fig = px.box(
-            f_df,
-            x='Model',
-            y='Wh_per_Mile',
-            color='Model',
-            title='Energy Efficiency Distribution by Model',
-            template='plotly_dark',
-            color_discrete_sequence=px.colors.qualitative.Bold
-        )
-        fig.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            showlegend=False,
-            xaxis_title="Model",
-            yaxis_title="Wh per Mile"
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("#### Energy Efficiency by Model")
         
-        with st.expander("📖 Understanding Box Plots"):
+        # Group data for better visualization
+        model_efficiency = f_df.groupby('Model')['Wh_per_Mile'].agg(['mean', 'min', 'max']).round(0)
+        st.bar_chart(model_efficiency['mean'])
+        
+        with st.expander("📖 Understanding Efficiency Metrics"):
             st.markdown("""
-            **Box Plot Components:**
-            - **Box**: Middle 50% of data (most common values)
-            - **Line in box**: Median (middle value)
-            - **Whiskers**: Range of typical values
-            - **Dots**: Outliers (unusual values)
+            **Wh/mi = Watt-hours per Mile**
             
-            **Lower Wh/mi = Better Efficiency**
-            - Model 3: Most efficient (~280 Wh/mi avg)
-            - Model X/Cybertruck: Least efficient due to size/weight
+            Think of it like MPG, but for electric vehicles:
+            - **Lower = Better** (more efficient)
+            - **250-280 Wh/mi**: Excellent (Model 3)
+            - **280-320 Wh/mi**: Good (Model Y)
+            - **320-380 Wh/mi**: Fair (Model X/S)
+            - **380+ Wh/mi**: Needs improvement
+            
+            Factors affecting efficiency:
+            - Vehicle weight and aerodynamics
+            - Driving style (acceleration, speed)
+            - Climate control usage
+            - Tire pressure and condition
             """)
     
     with col2:
-        # Efficiency rating distribution
+        st.markdown("#### Efficiency Rating Distribution")
         eff_dist = f_df['Efficiency_Rating'].value_counts().sort_index()
         
-        fig2 = go.Figure(data=[go.Bar(
-            x=eff_dist.index,
-            y=eff_dist.values,
-            marker=dict(color=['#6bcf7f', '#ffd93d', '#ff6b6b', '#E82127']),
-            text=eff_dist.values,
-            textposition='auto'
-        )])
-        fig2.update_layout(
-            title='Fleet Efficiency Distribution',
-            template='plotly_dark',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            xaxis_title="Efficiency Rating",
-            yaxis_title="Number of Vehicles"
-        )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.bar_chart(eff_dist)
         
         st.markdown("#### 📊 Efficiency Breakdown")
         st.markdown(f"""
-        - 🟢 **Excellent** (<250 Wh/mi): {len(f_df[f_df['Efficiency_Rating'] == 'Excellent'])} vehicles
-        - 🟡 **Good** (250-300): {len(f_df[f_df['Efficiency_Rating'] == 'Good'])} vehicles
-        - 🟠 **Fair** (300-350): {len(f_df[f_df['Efficiency_Rating'] == 'Fair'])} vehicles
-        - 🔴 **Poor** (>350): {len(f_df[f_df['Efficiency_Rating'] == 'Poor'])} vehicles
+        - 🟢 **Excellent** (<250 Wh/mi): {len(f_df[f_df['Efficiency_Rating'] == 'Excellent']):,} vehicles
+        - 🟡 **Good** (250-300): {len(f_df[f_df['Efficiency_Rating'] == 'Good']):,} vehicles
+        - 🟠 **Fair** (300-350): {len(f_df[f_df['Efficiency_Rating'] == 'Fair']):,} vehicles
+        - 🔴 **Poor** (>350): {len(f_df[f_df['Efficiency_Rating'] == 'Poor']):,} vehicles
         """)
     
     st.markdown("---")
@@ -607,30 +596,8 @@ with tab2:
     # Regional efficiency comparison
     st.markdown("### 🗺️ Regional Efficiency Comparison")
     
-    regional_eff = f_df.groupby('Region').agg({
-        'Wh_per_Mile': 'mean',
-        'VIN': 'count'
-    }).round(0)
-    regional_eff.columns = ['Avg Wh/Mile', 'Vehicle Count']
-    regional_eff = regional_eff.sort_values('Avg Wh/Mile')
-    
-    fig3 = go.Figure(data=[go.Bar(
-        x=regional_eff.index,
-        y=regional_eff['Avg Wh/Mile'],
-        marker=dict(color=regional_eff['Avg Wh/Mile'], colorscale='RdYlGn_r'),
-        text=regional_eff['Avg Wh/Mile'],
-        textposition='auto'
-    )])
-    fig3.update_layout(
-        title='Average Energy Consumption by Region',
-        template='plotly_dark',
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white'),
-        xaxis_title="Region",
-        yaxis_title="Wh per Mile"
-    )
-    st.plotly_chart(fig3, use_container_width=True)
+    regional_eff = f_df.groupby('Region')['Wh_per_Mile'].mean().sort_values()
+    st.bar_chart(regional_eff)
     
     col1, col2, col3 = st.columns(3)
     
@@ -641,7 +608,7 @@ with tab2:
         st.success(f"""
         **🏆 Most Efficient Region**
         
-        {best_region}: {regional_eff.loc[best_region, 'Avg Wh/Mile']:.0f} Wh/mi
+        {best_region}: {regional_eff[best_region]:.0f} Wh/mi
         
         Likely factors: Favorable climate, efficient driving patterns
         """)
@@ -659,9 +626,9 @@ with tab2:
         st.warning(f"""
         **⚠️ Improvement Opportunity**
         
-        {worst_region}: {regional_eff.loc[worst_region, 'Avg Wh/Mile']:.0f} Wh/mi
+        {worst_region}: {regional_eff[worst_region]:.0f} Wh/mi
         
-        {((regional_eff.loc[worst_region, 'Avg Wh/Mile'] - regional_eff.loc[best_region, 'Avg Wh/Mile']) / regional_eff.loc[best_region, 'Avg Wh/Mile'] * 100):.1f}% higher than best region
+        {((regional_eff[worst_region] - regional_eff[best_region]) / regional_eff[best_region] * 100):.1f}% higher than best region
         """)
 
 with tab3:
@@ -709,49 +676,18 @@ with tab3:
     
     st.markdown("---")
     
-    # Regional breakdown
+    # Regional breakdown charts
     col1, col2 = st.columns(2)
     
     with col1:
-        # Pie chart of vehicle distribution
+        st.markdown("#### Fleet Distribution by Region")
         region_dist = f_df['Region'].value_counts()
-        
-        fig = go.Figure(data=[go.Pie(
-            labels=region_dist.index,
-            values=region_dist.values,
-            hole=0.4,
-            marker=dict(colors=px.colors.qualitative.Bold)
-        )])
-        fig.update_layout(
-            title='Fleet Distribution by Region',
-            template='plotly_dark',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white')
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        st.bar_chart(region_dist)
     
     with col2:
-        # Battery health by region
-        fig2 = px.violin(
-            f_df,
-            x='Region',
-            y='Battery_SOH',
-            color='Region',
-            box=True,
-            title='Battery Health Distribution by Region',
-            template='plotly_dark',
-            color_discrete_sequence=px.colors.qualitative.Bold
-        )
-        fig2.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            showlegend=False,
-            xaxis_title="Region",
-            yaxis_title="Battery SOH %"
-        )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.markdown("#### Average Battery Health by Region")
+        regional_health = f_df.groupby('Region')['Battery_SOH'].mean().sort_values(ascending=False)
+        st.bar_chart(regional_health)
 
 with tab4:
     st.markdown("### 📊 Fleet Composition Analysis")
@@ -760,71 +696,19 @@ with tab4:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        # Model distribution
+        st.markdown("#### Model Distribution")
         model_dist = f_df['Model'].value_counts()
-        
-        fig = go.Figure(data=[go.Pie(
-            labels=model_dist.index,
-            values=model_dist.values,
-            hole=0.3,
-            marker=dict(colors=px.colors.qualitative.Set3)
-        )])
-        fig.update_layout(
-            title='Model Distribution',
-            template='plotly_dark',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            height=400
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        st.bar_chart(model_dist)
     
     with col2:
-        # Color distribution
+        st.markdown("#### Top 10 Colors")
         color_dist = f_df['Color'].value_counts().head(10)
-        
-        fig2 = go.Figure(data=[go.Bar(
-            x=color_dist.values,
-            y=color_dist.index,
-            orientation='h',
-            marker=dict(color=px.colors.qualitative.Pastel),
-            text=color_dist.values,
-            textposition='auto'
-        )])
-        fig2.update_layout(
-            title='Top 10 Colors',
-            template='plotly_dark',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            height=400,
-            xaxis_title="Vehicle Count",
-            yaxis_title="Color"
-        )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.bar_chart(color_dist)
     
     with col3:
-        # Software version distribution
+        st.markdown("#### Software Versions")
         sw_dist = f_df['Software_Version'].value_counts()
-        
-        fig3 = go.Figure(data=[go.Bar(
-            x=sw_dist.index,
-            y=sw_dist.values,
-            marker=dict(color='#E82127'),
-            text=sw_dist.values,
-            textposition='auto'
-        )])
-        fig3.update_layout(
-            title='Software Versions',
-            template='plotly_dark',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            height=400,
-            xaxis_title="Version",
-            yaxis_title="Vehicle Count"
-        )
-        st.plotly_chart(fig3, use_container_width=True)
+        st.bar_chart(sw_dist)
     
     st.markdown("---")
     
@@ -864,33 +748,16 @@ with tab5:
     
     with col1:
         ben_counts = f_df['Lead_Digit'].value_counts(normalize=True).sort_index().drop(0, errors='ignore')
-        benford_expected = [np.log10(1 + 1/d) for d in range(1, 10)]
         
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=list(range(1, 10)),
-            y=ben_counts.values,
-            name='Actual',
-            marker=dict(color='#E82127')
-        ))
-        fig.add_trace(go.Scatter(
-            x=list(range(1, 10)),
-            y=benford_expected,
-            name="Benford's Law Expected",
-            line=dict(color='#6bcf7f', width=3)
-        ))
-        fig.update_layout(
-            title='Leading Digit Distribution in Charging Costs',
-            template='plotly_dark',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            xaxis_title="Leading Digit",
-            yaxis_title="Frequency",
-            barmode='overlay'
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    
+        # Create comparison chart
+        benford_data = pd.DataFrame({
+            'Digit': list(range(1, 10)),
+            'Actual': [ben_counts.get(i, 0) for i in range(1, 10)],
+            'Expected': [np.log10(1 + 1/d) for d in range(1, 10)]
+        })
+        
+        st.line_chart(benford_data.set_index('Digit'))
+        
     with col2:
         st.markdown("**What is Benford's Law?**")
         st.info("""
@@ -901,8 +768,7 @@ with tab5:
         - Validates data authenticity
         - Identifies anomalies
         
-        **Green line**: Expected pattern
-        **Red bars**: Actual data
+        **Expected pattern**: Natural logarithmic distribution
         
         Close match = Legitimate data ✅
         """)
@@ -919,12 +785,12 @@ with tab5:
         soh_outliers = f_df[f_df['SOH_Z_Score'] < -2.5].sort_values('Battery_SOH')
         
         st.markdown(f"**⚠️ Battery Health Outliers** ({len(soh_outliers)} vehicles)")
-        st.dataframe(
-            soh_outliers[['VIN', 'Model', 'Battery_SOH', 'Odometer_Miles', 'Region']].head(10),
-            use_container_width=True
-        )
-        
         if len(soh_outliers) > 0:
+            st.dataframe(
+                soh_outliers[['VIN', 'Model', 'Battery_SOH', 'Odometer_Miles', 'Region']].head(10),
+                use_container_width=True
+            )
+            
             st.warning(f"""
             These vehicles have battery health significantly below fleet average.
             
@@ -933,6 +799,8 @@ with tab5:
             - Review charging patterns
             - Check for software updates
             """)
+        else:
+            st.success("No critical battery health outliers detected! ✅")
     
     with col2:
         # Efficiency outliers
@@ -941,12 +809,12 @@ with tab5:
         eff_outliers = f_df[f_df['Eff_Z_Score'] > 2.5].sort_values('Wh_per_Mile', ascending=False)
         
         st.markdown(f"**⚡ Efficiency Outliers** ({len(eff_outliers)} vehicles)")
-        st.dataframe(
-            eff_outliers[['VIN', 'Model', 'Wh_per_Mile', 'Tire_Pressure_PSI', 'Region']].head(10),
-            use_container_width=True
-        )
-        
         if len(eff_outliers) > 0:
+            st.dataframe(
+                eff_outliers[['VIN', 'Model', 'Wh_per_Mile', 'Tire_Pressure_PSI', 'Region']].head(10),
+                use_container_width=True
+            )
+            
             st.warning(f"""
             These vehicles consume unusually high energy.
             
@@ -956,49 +824,8 @@ with tab5:
             - Climate control usage
             - Aerodynamic issues
             """)
-    
-    st.markdown("---")
-    
-    # Correlation heatmap
-    st.markdown("#### 🔥 Correlation Matrix")
-    
-    corr_data = f_df[['Battery_SOH', 'Wh_per_Mile', 'Odometer_Miles', 
-                      'Supercharger_Ratio', 'Ambient_Temp_Avg', 'Autopilot_Miles']].corr()
-    
-    fig = go.Figure(data=go.Heatmap(
-        z=corr_data.values,
-        x=corr_data.columns,
-        y=corr_data.columns,
-        colorscale='RdYlGn',
-        zmid=0,
-        text=corr_data.values.round(2),
-        texttemplate='%{text}',
-        textfont={"size": 10}
-    ))
-    fig.update_layout(
-        title='Feature Correlation Analysis',
-        template='plotly_dark',
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white'),
-        height=500
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    
-    with st.expander("📖 Reading the Correlation Matrix"):
-        st.markdown("""
-        **Color Guide:**
-        - 🟢 **Green** (+1.0): Perfect positive correlation
-        - 🟡 **Yellow** (0.0): No correlation
-        - 🔴 **Red** (-1.0): Perfect negative correlation
-        
-        **Key Insights:**
-        - Battery SOH decreases as odometer increases (negative correlation)
-        - Supercharger usage correlates with faster degradation
-        - Ambient temperature affects efficiency
-        
-        **Numbers closer to +1 or -1 = Stronger relationship**
-        """)
+        else:
+            st.success("No critical efficiency outliers detected! ✅")
 
 # --- 9. DATA EXPORT & ARCHIVE ---
 st.divider()
@@ -1045,3 +872,21 @@ with col2:
 with col3:
     st.markdown("**🔒 Security**")
     st.caption("End-to-end encrypted • SOC 2 Type II Certified")
+
+# Install instructions reminder
+if not PLOTLY_AVAILABLE:
+    st.info("""
+    ### 📦 Enhance Your Dashboard
+    
+    For better interactive visualizations, install Plotly:
+    
+    ```bash
+    pip install plotly
+    ```
+    
+    The app will work without it, but Plotly provides:
+    - Interactive hover tooltips
+    - Zoom and pan capabilities
+    - Better color schemes
+    - Professional chart styling
+    """)
